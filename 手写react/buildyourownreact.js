@@ -113,6 +113,7 @@ const element = (
 const container = document.getElementById("root")
 Didact.render(element, container)
 
+/*
 // 实现render，先仅实现将元素添加到DOM中
 function render(element, container) {
     const dom = element.type === "TEXT_ELEMENT" ?
@@ -132,4 +133,123 @@ function render(element, container) {
     });
 
     container.appendChild(dom)
+}
+*/
+
+
+// 上述render递归调用渲染的方式存在问题，一旦开始渲染就无法停止会阻塞主线程
+// 重构 -- 拆成小单元，使用requestIdleCallback
+let nextUnitOfWork = null
+let wipRoot = null // 进行中的工作根节点
+
+function commitRoot() {
+    commitWork(wipRoot.child)
+    wipRoot = null
+}
+
+function commitWork(fiber) {
+    // 递归将节点添加到dom
+    if (!fiber) {
+        return
+    }
+    const domParent = fiber.parent.dom
+    domParent.appendChild(fiber.dom)
+    commitWork(fiber.child)
+    commitWork(fiber.sibling)
+}
+
+function workLoop(deadline) {
+    let shouldYield = false
+    while (nextUnitOfWork && !shouldYield) {
+        nextUnitOfWork = performUnitOfWork(nextUnitOfWork)
+        shouldYield = deadline.timeRemaining() < 1
+    }
+
+    // 一旦完成所有工作（通过没有下一个工作单元判断）
+    // 就将整个fiber树提交到dom
+    if (!nextUnitOfWork && wipRoot) {
+        commitRoot()
+    }
+
+    // 目前react使用了调度器包而非requestIdleCallback
+    // 但概念上一致
+    requestIdleCallback(workLoop)
+}
+
+
+function performUnitOfWork(fiber) {
+    if (!fiber.dom) {
+        fiber.dom = createDom(fiber)
+    }
+
+    // if (fiber.parent) {
+    //     fiber.parent.dom.appendChild(fiber.dom)
+    // }
+    // 由于浏览器可能在渲染整个树之前中断我们操作
+    // 因此上述操作会导致用户看到界面不完整，因此移除, 
+    // 转而关注wiproot（进行中的工作根节点）
+
+    const elements = fiber.props.children
+    let index = 0
+    let prevSibling = null
+
+    while (index < elements.length) {
+        const element = elements[index]
+
+        const newFiber = {
+            type: element.type,
+            props: element.props,
+            parent: fiber,
+            dom: null
+        }
+
+        if (index === 0) {
+            // 第一个孩子是孩子
+            fiber.child = newFiber
+        } else {
+            // 第二个及之后孩子是前一个孩子的兄弟
+            prevSibling.prevSibling = newFiber
+        }
+
+        prevSibling = newFiber
+        index++
+    }
+
+    // 返回下一个工作单元
+    // 先看有无孩子
+    if (fiber.child) {
+        return fiber.child
+    }
+    let nextFiber = fiber
+    // 再看有无兄弟、以及叔叔等
+    while (nextFiber) {
+        if (nextFiber.sibling) {
+            return nextFiber.sibling
+        }
+        nextFiber = nextFiber.parent
+    }
+
+}
+
+function createDom(fiber) {
+    const dom = fiber.type === "TEXT_ELEMENT" ?
+        document.createTextNode("") :
+        document.createElement(fiber.type)
+
+    const isProperty = key => key !== "children"
+    Object.keys(fiber.props)
+        .filter(isProperty)
+        .forEach(name => dom[name] = fiber.props[name])
+
+    return dom
+}
+// 重构render
+function render(element, container) {
+    wipRoot = {
+        dom: container,
+        props: {
+            children: [element]
+        }
+    }
+    nextUnitOfWork = wipRoot
 }
