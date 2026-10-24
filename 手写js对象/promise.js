@@ -6,6 +6,7 @@ const PENDING = 'pending'
 class MyPromise {
     #state = PENDING
     #result = undefined
+    #handlers = []
     constructor(executor) {
         // executor是一个任务，启动promise执行
 
@@ -25,8 +26,13 @@ class MyPromise {
 
     then(onFulfilled, onRejected) {
         return new MyPromise((resolve, reject) => {
-            if (this.#state === FULLFILLED) { }
-            else if (this.#state === REJECTED) { }
+            this.#handlers.push({
+                onFulfilled,
+                onRejected,
+                resolve,
+                reject
+            })
+            this.#run()
         })
     }
 
@@ -35,10 +41,33 @@ class MyPromise {
         this.#state = state
         this.#result = result
         console.log('state', this.#state, 'result', this.#result)
+        this.#run()
+    }
+
+    #run() {
+        if (this.#state === PENDING) return
+        while (this.#handlers.length) {
+            const { onFulfilled, onRejected, resolve, reject } = this.#handlers.shift()
+            if (this.#state === FULLFILLED) {
+                if (onFulfilled && typeof onFulfilled === 'function') {
+                    onFulfilled(this.#result)
+                }
+            } else {
+                if (onRejected && typeof onRejected === 'function') {
+                    onRejected(this.#result)
+                }
+            }
+        }
     }
 }
 
 const promise = new MyPromise((resolve, reject) => {
     reject(2)
     resolve(1)
+})
+
+promise.then((res) => {
+    console.log('res', res)
+}, (err) => {
+    console.log('err', err)
 })
