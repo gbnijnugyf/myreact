@@ -44,19 +44,36 @@ class MyPromise {
         this.#run()
     }
 
+    #isPromiseLike(obj) {
+        // promise A+规范中规定，thenable对象是指具有then方法的对象
+        return obj && (typeof obj === 'object' || typeof obj === 'function') && typeof obj.then === 'function'
+    }
+
+    #runMicroTask(func) {
+
+    }
+
     #runOne(callback, resolve, reject) {
-        if (callback && typeof callback === 'function') {
-            try {
-                const result = callback(this.#result)
-                resolve(result)
-            } catch (error) {
-                reject(error)
+        this.#runMicroTask(() => {
+            if (callback && typeof callback === 'function') {
+                try {
+                    const result = callback(this.#result)
+                    if (this.#isPromiseLike(result)) {
+                        result.then(resolve, reject)
+
+                    } else {
+                        resolve(result)
+                    }
+                } catch (error) {
+                    reject(error)
+                }
             }
-        }
-        else {
-            const settled = this.#state === FULLFILLED ? resolve : reject
-            settled(this.#result)
-        }
+            else {
+                const settled = this.#state === FULLFILLED ? resolve : reject
+                settled(this.#result)
+            }
+
+        })
     }
 
     #run() {
