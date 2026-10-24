@@ -96,6 +96,48 @@ class MyPromise {
             }
         }
     }
+
+    catch(callback) {
+        return this.then(null, callback)
+    }
+
+    finally(callback) {
+        return this.then(
+            (value) => {
+                callback()
+                return value
+            },
+            (error) => {
+                callback()
+                throw error
+            }
+        )
+    }
+
+    static resolve(value) {
+        if (value instanceof MyPromise) {
+            return value
+        }
+        let _resolve, _reject
+        const p = new MyPromise((resolve, reject) => {
+            _resolve = resolve
+            _reject = reject
+        })
+        if (p.#isPromiseLike(value)) {
+            value.then(_resolve, _reject)
+        } else {
+            _resolve(value)
+        }
+        return p
+    }
+
+
+    static reject(value) {
+        return new MyPromise((resolve, reject) => {
+            reject(value)
+        })
+    }
+
 }
 
 const promise = new MyPromise((resolve, reject) => {
