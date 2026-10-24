@@ -50,7 +50,16 @@ class MyPromise {
     }
 
     #runMicroTask(func) {
-
+        queueMicrotask(func)
+        // 或区分node、浏览器环境，分别使用process.nextTick(func)或MutationObserver(func)
+        // if (typeof process === 'object' && typeof process.nextTick === 'function') {
+        //     process.nextTick(func)
+        // } else if (typeof MutationObserver === 'function') {
+        //     const observer = new MutationObserver(func)
+        //     const textNode = document.createTextNode('')
+        //     observer.observe(textNode, { characterData: true })
+        //     textNode.data = '1'
+        // }
     }
 
     #runOne(callback, resolve, reject) {
@@ -91,10 +100,17 @@ class MyPromise {
 
 const promise = new MyPromise((resolve, reject) => {
     // reject(2)
-    resolve(111)
+    // 使用setTimeout模拟异步操作
+    setTimeout(() => {
+        resolve(1)
+    }, 1000)
+    // resolve(111)
 })
 
-promise.then(123132123123, (err) => {
+promise.then((res) => {
+    console.log('res', res)
+    return 123
+}, (err) => {
     console.log('err', err)
 }).then((res) => {
     console.log('res', res)
