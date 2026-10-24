@@ -40,8 +40,23 @@ class MyPromise {
         if (this.#state !== PENDING) return
         this.#state = state
         this.#result = result
-        console.log('state', this.#state, 'result', this.#result)
+        // console.log('state', this.#state, 'result', this.#result)
         this.#run()
+    }
+
+    #runOne(callback, resolve, reject) {
+        if (callback && typeof callback === 'function') {
+            try {
+                const result = callback(this.#result)
+                resolve(result)
+            } catch (error) {
+                reject(error)
+            }
+        }
+        else {
+            const settled = this.#state === FULLFILLED ? resolve : reject
+            settled(this.#result)
+        }
     }
 
     #run() {
@@ -49,25 +64,35 @@ class MyPromise {
         while (this.#handlers.length) {
             const { onFulfilled, onRejected, resolve, reject } = this.#handlers.shift()
             if (this.#state === FULLFILLED) {
-                if (onFulfilled && typeof onFulfilled === 'function') {
-                    onFulfilled(this.#result)
-                }
+                this.#runOne(onFulfilled, resolve, reject)
             } else {
-                if (onRejected && typeof onRejected === 'function') {
-                    onRejected(this.#result)
-                }
+                this.#runOne(onRejected, resolve, reject)
             }
         }
     }
 }
 
 const promise = new MyPromise((resolve, reject) => {
-    reject(2)
-    resolve(1)
+    // reject(2)
+    resolve(111)
 })
 
-promise.then((res) => {
-    console.log('res', res)
-}, (err) => {
+promise.then(123132123123, (err) => {
     console.log('err', err)
-})
+}).then((res) => {
+    console.log('res', res)
+},
+    (err) => {
+        console.log('err', err)
+    }
+)
+// promise.then((res) => {
+//     console.log('res', res)
+//     throw 321
+// }, (err) => {
+//     console.log('err', err)
+// }).then((res) => {
+//     console.log('res', res)
+// }, (err) => {
+//     console.log('err', err)
+// })
